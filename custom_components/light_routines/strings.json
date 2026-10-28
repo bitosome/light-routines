@@ -4,14 +4,17 @@
     "step": {
       "user": {
         "title": "Light routines",
-        "description": "Create daily sunrise and manual bedtime routines. Stopping a routine freezes its current brightness; starting the other replaces it. The daily schedule can be disabled independently.",
+        "description": "Set each routine\u2019s duration in minutes. Automatic starts are optional; manual start/stop switches always remain available. Start times use Home Assistant\u2019s local timezone.",
         "data": {
           "name": "Room / routine name",
           "lights": "Dimmable lights",
           "wake_time": "Daily wake-up start time",
           "wake_duration": "Wake-up fade duration",
           "bed_duration": "Bedtime fade duration",
-          "wake_brightness": "Wake-up target brightness"
+          "wake_brightness": "Maximum wake-up brightness",
+          "wake_enabled": "Start wake-up automatically every day",
+          "bed_enabled": "Start bedtime automatically every day",
+          "bed_time": "Daily bedtime start time"
         }
       }
     },
@@ -19,7 +22,8 @@
       "required_values": "Enter a name and select at least one light.",
       "not_dimmable": "Every selected light must expose brightness control.",
       "lights_in_use": "A selected light already belongs to another Light Routines entry.",
-      "routine_active": "Stop the active routine before changing its settings."
+      "routine_active": "Stop the active routine before changing its settings.",
+      "same_start_time": "Choose different start times when both automatic routines are enabled."
     }
   },
   "options": {
@@ -32,15 +36,20 @@
           "wake_time": "Daily wake-up start time",
           "wake_duration": "Wake-up fade duration",
           "bed_duration": "Bedtime fade duration",
-          "wake_brightness": "Wake-up target brightness"
-        }
+          "wake_brightness": "Maximum wake-up brightness",
+          "wake_enabled": "Start wake-up automatically every day",
+          "bed_enabled": "Start bedtime automatically every day",
+          "bed_time": "Daily bedtime start time"
+        },
+        "description": "Set each routine\u2019s duration in minutes. Automatic starts are optional; manual start/stop switches always remain available. Start times use Home Assistant\u2019s local timezone."
       }
     },
     "error": {
       "required_values": "Enter a name and select at least one light.",
       "not_dimmable": "Every selected light must expose brightness control.",
       "lights_in_use": "A selected light already belongs to another Light Routines entry.",
-      "routine_active": "Stop the active routine before changing its settings."
+      "routine_active": "Stop the active routine before changing its settings.",
+      "same_start_time": "Choose different start times when both automatic routines are enabled."
     }
   }
 }

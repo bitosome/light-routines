@@ -6,6 +6,7 @@ PLATFORMS = ["switch", "sensor"]
 async def async_setup_entry(hass, entry):
     controller = entry.runtime_data = Controller(hass, entry)
     await controller.setup()
+    entry.async_on_unload(entry.add_update_listener(async_update_options))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
@@ -14,3 +15,6 @@ async def async_unload_entry(hass, entry):
         await entry.runtime_data.close()
         return True
     return False
+
+async def async_update_options(hass, entry):
+    await entry.runtime_data.update_config()

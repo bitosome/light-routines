@@ -1,22 +1,22 @@
 # Light Routines
 
-A configurable HACS integration for gentle daily wake-up lighting and manual bedtime fades. Uses existing Home Assistant lights, with no cloud service, custom dashboard dependency or household identifiers.
+A configurable HACS integration for gentle daily wake-up lighting and bedtime fades. Uses existing Home Assistant lights, with no cloud service, custom dashboard dependency or household identifiers.
 
 ## Install
 
 1. In HACS, add `https://github.com/bitosome/light-routines` as a custom **Integration** repository, then download it.
 2. Restart Home Assistant if prompted.
 3. Add **Light Routines** under Settings → Devices & services → Add integration.
-4. Choose a name, one or more dimmable lights, daily wake-up time, durations and wake-up target.
+4. Choose a name, one or more dimmable lights, independent automatic start toggles/times, durations and wake-up target.
 
-Each entry is one room. A bulb cannot belong to two entries. Configure changes through the integration's options after stopping any running routine. Settings are stored by Home Assistant and shared by all users.
+Each entry is one room. A bulb cannot belong to two entries. Configure changes through the integration's options after stopping any running routine. Settings are stored by Home Assistant and shared by all users. Choose **Configure** on the integration entry to edit wake-up/bedtime automatic start toggles, start times, durations (1–120 minutes), and maximum wake-up brightness (1–100%). New settings apply without a Home Assistant restart.
 
 ## Controls
 
 - **Wake up** switch: start immediately at minimum brightness and fade to the selected target, using a smooth sunrise curve. Default: 30 minutes, 80%.
 - **Bedtime** switch: fade each bulb from its own current brightness to fully off. Bulbs already off remain off. Default: 30 minutes.
 - Turn either switch **off** to cancel and freeze the calculated current brightness. Starting the opposite routine cancels the existing fade first. Starting an already running routine is idempotent.
-- **Daily wake-up schedule** switch: independently enable/disable the automatic wake-up. Enabled initially, every day at 07:15 in Home Assistant's local timezone. Bedtime is manual.
+- **Daily wake-up schedule** switch: independently enable/disable the automatic wake-up. Enabled initially, every day at 07:15 in Home Assistant's local timezone. **Daily bedtime schedule** is off initially, with a configurable 20:00 default start time. Both toggles and start times are also in the integration configuration. Schedule switches and configuration stay synchronized. Manual routine switches remain available when schedules are disabled.
 - **Wake up remaining / Bedtime remaining** duration sensors and **Status** sensor expose progress and outcomes. Remaining time is also an attribute on each routine switch. Add these entities to any dashboard, including Space Hub tiles.
 
 ## Reliability and limits

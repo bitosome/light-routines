@@ -10,7 +10,7 @@ async def test_setup_is_passive_and_entities_exist(hass, routine):
     entry,calls=routine
     assert calls==[]
     switches=[s for s in hass.states.async_all() if s.entity_id.startswith('switch.test_room')]
-    assert len(switches)==3
+    assert len(switches)==4
     assert sum(s.state=='on' for s in switches)==1
 
 async def test_wake_target_and_stop(hass,routine):
@@ -110,3 +110,43 @@ def test_interpolation_endpoints():
     assert levels(s,0)=={'light.test':1}
     assert levels(s,1800)=={'light.test':204}
     assert levels(s,9999)=={'light.test':204}
+
+async def test_options_exposes_each_schedule_duration_and_brightness(hass, routine):
+    entry,_=routine
+    form=await hass.config_entries.options.async_init(entry.entry_id)
+    values=form['data_schema']({})
+    assert values['wake_enabled'] is True and values['bed_enabled'] is False
+    assert values['wake_time']=='07:15:00'
+    assert values['wake_duration']==30 and values['bed_duration']==30
+    assert values['wake_brightness']==80
+    result=await hass.config_entries.options.async_configure(form['flow_id'],{**values,'wake_enabled':False,'bed_enabled':True,'bed_time':'21:30:00','bed_duration':15,'wake_duration':45,'wake_brightness':60})
+    assert result['type']=='create_entry'
+    await hass.async_block_till_done()
+    c=entry.runtime_data
+    assert not c.schedule_enabled and c.bed_schedule_enabled
+    assert c.config['wake_brightness']==60 and c.config['bed_duration']==15
+    await c.set_schedule(False,'bed')
+    await hass.async_block_till_done()
+    form=await hass.config_entries.options.async_init(entry.entry_id)
+    assert form['data_schema']({})['bed_enabled'] is False
+
+async def test_bed_schedule_runs_once_and_manual_wake_works_when_disabled(hass,routine):
+    entry,calls=routine;c=entry.runtime_data
+    await c.set_schedule(False)
+    await hass.async_block_till_done()
+    c.config['bed_time']=dt_util.as_local(dt_util.utcnow()).strftime('%H:%M:00')
+    c.bed_schedule_enabled=True
+    await c.tick(dt_util.utcnow())
+    assert c.session['mode']=='bed'
+    await c.stop('bed');count=len(calls)
+    await c.tick(dt_util.utcnow())
+    assert len(calls)==count
+    await c.start('wake')
+    assert c.session['mode']=='wake'
+
+async def test_same_enabled_schedule_time_rejected(hass,routine):
+    entry,_=routine
+    form=await hass.config_entries.options.async_init(entry.entry_id)
+    data={**DEFAULTS,**entry.data,'bed_enabled':True,'bed_time':'07:15:00'}
+    result=await hass.config_entries.options.async_configure(form['flow_id'],data)
+    assert result['errors']=={'base':'same_start_time'}

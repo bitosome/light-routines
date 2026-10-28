@@ -10,7 +10,7 @@ from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN
+from .const import DOMAIN, DEFAULTS
 
 
 def levels(session, now):
@@ -26,10 +26,12 @@ class Controller:
     def __init__(self, hass, entry):
         self.hass = hass
         self.entry = entry
-        self.config = {**entry.data, **entry.options}
+        self.config = {**DEFAULTS, **entry.data, **entry.options}
         self.store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}")
         self.session = None
-        self.schedule_enabled = True
+        self.schedule_enabled = self.config["wake_enabled"]
+        self.bed_schedule_enabled = self.config["bed_enabled"]
+        self.last_bed_date = None
         self.last_wake_date = None
         self.status = "Idle"
         self.listeners = set()
@@ -41,7 +43,8 @@ class Controller:
     async def setup(self):
         data = await self.store.async_load() or {}
         self.session = data.get("session")
-        self.schedule_enabled = data.get("schedule_enabled", True)
+        self.schedule_enabled = self.entry.options.get("wake_enabled", self.entry.data.get("wake_enabled", data.get("schedule_enabled", True)))
+        self.last_bed_date = data.get("last_bed_date")
         self.last_wake_date = data.get("last_wake_date")
         if self.session:
             self.status = "Resuming"
@@ -61,7 +64,7 @@ class Controller:
 
     async def save(self):
         await self.store.async_save({"session": self.session, "schedule_enabled": self.schedule_enabled,
-                                     "last_wake_date": self.last_wake_date})
+                                     "last_wake_date": self.last_wake_date, "last_bed_date": self.last_bed_date})
 
     async def close(self):
         self.closed = True
@@ -75,9 +78,25 @@ class Controller:
             return 0
         return max(0, math.ceil(self.session["end"] - dt_util.utcnow().timestamp()))
 
-    async def set_schedule(self, enabled):
+    async def update_config(self):
         async with self.lock:
-            self.schedule_enabled = enabled
+            self.config = {**DEFAULTS, **self.entry.data, **self.entry.options}
+            self.schedule_enabled = self.config["wake_enabled"]
+            self.bed_schedule_enabled = self.config["bed_enabled"]
+            await self.save()
+            self.notify()
+
+    async def set_schedule(self, enabled, mode="wake"):
+        async with self.lock:
+            other_enabled = self.bed_schedule_enabled if mode == "wake" else self.schedule_enabled
+            if enabled and other_enabled and self.config["wake_time"][:5] == self.config["bed_time"][:5]:
+                raise HomeAssistantError("Choose different start times before enabling both schedules")
+            if mode == "wake":
+                self.schedule_enabled = enabled
+            else:
+                self.bed_schedule_enabled = enabled
+            self.config[f"{mode}_enabled"] = enabled
+            self.hass.config_entries.async_update_entry(self.entry, options={**self.entry.options, f"{mode}_enabled": enabled})
             await self.save()
             self.notify()
 
@@ -188,11 +207,11 @@ class Controller:
                         await self.apply(now.timestamp())
                 local = dt_util.as_local(now)
                 date = local.date().isoformat()
-                if (self.schedule_enabled and local.strftime("%H:%M") == self.config["wake_time"][:5]
-                        and self.last_wake_date != date):
-                    self.last_wake_date = date
-                    await self.save()  # Cancel/restart within this minute must not start it twice.
-                    await self._start("wake")
+                for mode, enabled, last_date in [("wake", self.schedule_enabled, self.last_wake_date), ("bed", self.bed_schedule_enabled, self.last_bed_date)]:
+                    if enabled and local.strftime("%H:%M") == self.config[f"{mode}_time"][:5] and last_date != date:
+                        setattr(self, f"last_{mode}_date", date)
+                        await self.save()
+                        await self._start(mode)
             except HomeAssistantError:
                 await self.failed()
             self.notify()
