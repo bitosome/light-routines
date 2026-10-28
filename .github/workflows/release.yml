@@ -1,0 +1,25 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - run: pip install -r requirements-test.txt
+      - run: pytest -q
+      - name: Verify version and package
+        run: |
+          python -c 'import json,os; assert "v"+json.load(open("custom_components/light_routines/manifest.json"))["version"]==os.environ["GITHUB_REF_NAME"]'
+          cd custom_components
+          zip -r ../light-routines.zip light_routines -x '*/__pycache__/*' '*.pyc'
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" light-routines.zip --generate-notes --verify-tag

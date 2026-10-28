@@ -1,0 +1,3 @@
+# Light Routines
+
+Own implementation here, not in production-only scripts. Keep room/light IDs out of source and tests. Configuration uses native Home Assistant flows; dashboard tiles use existing entity contracts. Persist run intent before light commands, serialize commands, and never run competing fades. Do not use long native transitions that cannot be cancelled. Adding/configuring the integration must not actuate lights. Test with mocked services and actual Home Assistant lifecycle; no physical test without explicit authorization. Run pytest before release. Bump manifest version, push main, release an annotated tag; keep release assets reproducible and free of caches.

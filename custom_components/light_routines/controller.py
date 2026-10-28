@@ -1,0 +1,198 @@
+"""Single-writer, persisted light fades. No commands during entry setup."""
+import asyncio
+import math
+from datetime import timedelta
+
+from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
+from homeassistant.core import CoreState, callback
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.helpers.storage import Store
+from homeassistant.util import dt as dt_util
+
+from .const import DOMAIN
+
+
+def levels(session, now):
+    """Absolute-time interpolation avoids accumulated scheduler drift."""
+    progress = min(1.0, max(0.0, (now - session["start"]) / (session["end"] - session["start"])))
+    # A smooth sunrise, without an abrupt initial increase; bedtime stays linear.
+    fraction = progress * progress * (3 - 2 * progress) if session["mode"] == "wake" else progress
+    return {light: round(value + (session["target"] - value) * fraction)
+            for light, value in session["initial"].items()}
+
+
+class Controller:
+    def __init__(self, hass, entry):
+        self.hass = hass
+        self.entry = entry
+        self.config = {**entry.data, **entry.options}
+        self.store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}")
+        self.session = None
+        self.schedule_enabled = True
+        self.last_wake_date = None
+        self.status = "Idle"
+        self.listeners = set()
+        self.lock = asyncio.Lock()
+        self.last_levels = {}
+        self.unsub = None
+        self.closed = False
+
+    async def setup(self):
+        data = await self.store.async_load() or {}
+        self.session = data.get("session")
+        self.schedule_enabled = data.get("schedule_enabled", True)
+        self.last_wake_date = data.get("last_wake_date")
+        if self.session:
+            self.status = "Resuming"
+        if self.hass.state == CoreState.running:
+            self.activate()
+        else:
+            self.unsub = self.hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, self.activate)
+
+    @callback
+    def activate(self, event=None):
+        self.unsub = async_track_time_interval(self.hass, self.tick, timedelta(seconds=5))
+
+    @callback
+    def notify(self):
+        for listener in tuple(self.listeners):
+            listener()
+
+    async def save(self):
+        await self.store.async_save({"session": self.session, "schedule_enabled": self.schedule_enabled,
+                                     "last_wake_date": self.last_wake_date})
+
+    async def close(self):
+        self.closed = True
+        if self.unsub:
+            self.unsub()
+        async with self.lock:
+            await self.save()
+
+    def remaining(self, mode):
+        if not self.session or self.session["mode"] != mode:
+            return 0
+        return max(0, math.ceil(self.session["end"] - dt_util.utcnow().timestamp()))
+
+    async def set_schedule(self, enabled):
+        async with self.lock:
+            self.schedule_enabled = enabled
+            await self.save()
+            self.notify()
+
+    async def start(self, mode):
+        async with self.lock:
+            if self.closed:
+                raise HomeAssistantError("Integration is unloading")
+            await self._start(mode)
+
+    async def _start(self, mode):
+        if self.session and self.session["mode"] == mode:
+            return
+        # Check all bulbs before replacing a running sequence.
+        initial = {}
+        for light in self.config["lights"]:
+            state = self.hass.states.get(light)
+            if not state or state.state not in ("on", "off"):
+                raise HomeAssistantError(f"Light unavailable: {light}")
+            if mode == "bed" and state.state == "on" and not isinstance(state.attributes.get("brightness"), (int, float)):
+                raise HomeAssistantError(f"Brightness unavailable: {light}")
+            initial[light] = (state.attributes.get("brightness", 0) or 0) if state.state == "on" else 0
+        if self.session:
+            await self._stop()
+            # Stop freezes the old fade at its calculated level; use that level.
+            if mode == "bed":
+                initial.update(self.last_levels)
+        now = dt_util.utcnow().timestamp()
+        self.session = {"mode": mode, "start": now, "end": now + 60 * self.config[f"{mode}_duration"],
+                        "initial": initial if mode == "bed" else {light: 1 for light in initial},
+                        "target": round(self.config["wake_brightness"] * 255 / 100) if mode == "wake" else 0}
+        self.last_levels = {}
+        self.status = "Waking up" if mode == "wake" else "Going to bed"
+        await self.save()  # Persist intent before commanding lights.
+        try:
+            await self.apply(now, transition=0)
+        except Exception:
+            await self.failed()
+            raise
+        self.notify()
+
+    async def stop(self, mode):
+        async with self.lock:
+            if self.session and self.session["mode"] == mode:
+                await self._stop()
+
+    async def _stop(self):
+        # Cancel queued work first. Freeze any in-flight bulb transition explicitly.
+        session = self.session
+        self.session = None
+        self.status = "Cancelled"
+        await self.save()
+        self.notify()
+        if session:
+            values = levels(session, dt_util.utcnow().timestamp())
+            self.last_levels = values
+            errors = []
+            for light, value in values.items():
+                try:
+                    await self.command(light, value, 0)
+                except HomeAssistantError as err:
+                    errors.append(str(err))
+            if errors:
+                self.status = "Cancelled · some lights unavailable"
+                self.notify()
+                raise HomeAssistantError("; ".join(errors))
+
+    async def command(self, light, value, transition):
+        state = self.hass.states.get(light)
+        if not state or state.state not in ("on", "off"):
+            raise HomeAssistantError(f"Light unavailable: {light}")
+        data = {"entity_id": light}
+        if state.attributes.get("supported_features", 0) & 32:
+            data["transition"] = transition
+        if value > 0:
+            data["brightness"] = max(1, min(255, value))
+        await self.hass.services.async_call("light", "turn_on" if value > 0 else "turn_off", data, blocking=True)
+
+    async def apply(self, now, transition=5):
+        values = levels(self.session, now)
+        for light, value in values.items():
+            if self.last_levels.get(light) != value:
+                await self.command(light, value, 0 if now >= self.session["end"] else transition)
+                self.last_levels[light] = value
+        if now >= self.session["end"]:
+            self.session = None
+            self.status = "Completed"
+            await self.save()
+
+    async def failed(self):
+        self.session = None
+        self.status = "Stopped · light command failed"
+        await self.save()
+        self.notify()
+
+    async def tick(self, now):
+        async with self.lock:
+            if self.closed:
+                return
+            try:
+                if self.session:
+                    # Resume a still-current fade; do not switch lights on hours after a missed wake-up.
+                    if self.status == "Resuming" and now.timestamp() > self.session["end"]:
+                        self.session = None
+                        self.status = "Interrupted while Home Assistant was offline"
+                        await self.save()
+                    else:
+                        self.status = "Waking up" if self.session["mode"] == "wake" else "Going to bed"
+                        await self.apply(now.timestamp())
+                local = dt_util.as_local(now)
+                date = local.date().isoformat()
+                if (self.schedule_enabled and local.strftime("%H:%M") == self.config["wake_time"][:5]
+                        and self.last_wake_date != date):
+                    self.last_wake_date = date
+                    await self.save()  # Cancel/restart within this minute must not start it twice.
+                    await self._start("wake")
+            except HomeAssistantError:
+                await self.failed()
+            self.notify()

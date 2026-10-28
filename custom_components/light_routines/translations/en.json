@@ -1,0 +1,46 @@
+{
+  "title": "Light Routines",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Light routines",
+        "description": "Create daily sunrise and manual bedtime routines. Stopping a routine freezes its current brightness; starting the other replaces it. The daily schedule can be disabled independently.",
+        "data": {
+          "name": "Room / routine name",
+          "lights": "Dimmable lights",
+          "wake_time": "Daily wake-up start time",
+          "wake_duration": "Wake-up fade duration",
+          "bed_duration": "Bedtime fade duration",
+          "wake_brightness": "Wake-up target brightness"
+        }
+      }
+    },
+    "error": {
+      "required_values": "Enter a name and select at least one light.",
+      "not_dimmable": "Every selected light must expose brightness control.",
+      "lights_in_use": "A selected light already belongs to another Light Routines entry.",
+      "routine_active": "Stop the active routine before changing its settings."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Light routine settings",
+        "data": {
+          "name": "Room / routine name",
+          "lights": "Dimmable lights",
+          "wake_time": "Daily wake-up start time",
+          "wake_duration": "Wake-up fade duration",
+          "bed_duration": "Bedtime fade duration",
+          "wake_brightness": "Wake-up target brightness"
+        }
+      }
+    },
+    "error": {
+      "required_values": "Enter a name and select at least one light.",
+      "not_dimmable": "Every selected light must expose brightness control.",
+      "lights_in_use": "A selected light already belongs to another Light Routines entry.",
+      "routine_active": "Stop the active routine before changing its settings."
+    }
+  }
+}
