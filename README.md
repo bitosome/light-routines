@@ -32,3 +32,17 @@ Light failures stop the routine and surface in Status. Other lights may already 
 Python 3.14; `pip install -r requirements-test.txt`, then `pytest -q`. Tests use real Home Assistant lifecycle fixtures and mocked light services, never physical devices.
 
 **Current brightness** reports the mean of the configured bulbs’ actual reported brightness (off = 0%), also available as `current_brightness_pct` on the routine switches. Missing/unavailable brightness makes the aggregate unavailable, rather than presenting a misleading percentage. This is actual light telemetry, not elapsed routine progress or a commanded estimate.
+
+## Native setting entities
+
+Each room exposes nine configuration entities, usable from dashboards, automations and Companion:
+
+| Domain | Settings |
+| --- | --- |
+| `time` | Wake-up start time, bedtime start time (local time, minute resolution) |
+| `number` | Wake-up duration, bedtime duration (minutes), wake-up maximum brightness (%), wake-up white temperature, bedtime white temperature (K) |
+| `select` | Wake-up color mode, bedtime color mode |
+
+These entities edit the same persistent Home Assistant entry options shown in **Configure**. No separate helper values or browser-local settings are used. Select options reflect capabilities shared by the selected bulbs; tunable-white bulbs offer Keep current color and White temperature. Temperature values are clamped to each bulb's supported range when applied. Temperature entities are unavailable for bulbs without that capability. RGB values for color-capable bulbs remain in Configure.
+
+Stop a running routine before changing its parameters; schedule-enable switches remain independently usable. Changing settings never sends a light command. Light selection remains in Configure. Existing entity IDs and run switches are preserved.

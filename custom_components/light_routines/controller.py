@@ -11,7 +11,8 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, DEFAULTS
-from .color import color_command, routine_color
+from .color import color_command, routine_color, RGB_MODES
+from .settings import validate
 
 
 def levels(session, now):
@@ -117,6 +118,52 @@ class Controller:
             self.bed_schedule_enabled = self.config["bed_enabled"]
             self.watch_lights()
             await self.save()
+            self.notify()
+
+    def color_modes(self):
+        states = [self.hass.states.get(light) for light in self.config["lights"]]
+        modes = [set(s.attributes.get("supported_color_modes", [])) if s else set() for s in states]
+        result = ["unchanged"]
+        if modes and all("color_temp" in mode for mode in modes):
+            result.append("temperature")
+        if modes and all(mode & RGB_MODES for mode in modes):
+            result.append("rgb")
+        return result
+
+    async def set_setting(self, key, value):
+        async with self.lock:
+            if self.closed:
+                raise HomeAssistantError("Integration is unloading")
+            if self.session:
+                raise HomeAssistantError("Stop the active routine before changing its settings")
+            bounds = {"wake_duration": (1, 120), "bed_duration": (1, 120), "wake_brightness": (1, 100),
+                      "wake_color_temperature": (1500, 6500), "bed_color_temperature": (1500, 6500)}
+            if key in bounds:
+                low, high = bounds[key]
+                if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or not float(value).is_integer():
+                    raise HomeAssistantError("Use a whole-number setting")
+                if not isinstance(value, (int, float)) or isinstance(value, bool) or not low <= value <= high:
+                    raise HomeAssistantError(f"Setting must be between {low} and {high}")
+                value = int(value)
+            elif key in ("wake_time", "bed_time"):
+                parsed = dt_util.parse_time(value) if isinstance(value, str) else None
+                if parsed is None:
+                    raise HomeAssistantError("Use a valid start time")
+                value = parsed.replace(second=0, microsecond=0).isoformat()
+            elif key in ("wake_color_mode", "bed_color_mode"):
+                if value not in self.color_modes():
+                    raise HomeAssistantError("The configured bulbs do not support this color mode")
+            else:
+                raise HomeAssistantError("Unknown routine setting")
+            updated = {**self.config, key: value}
+            error = validate(self.hass, updated, self.entry.entry_id)
+            if error:
+                raise HomeAssistantError({"same_start_time": "Choose different start times when both schedules are enabled",
+                                          "unsupported_color": "The configured bulbs do not support this color mode"}.get(error, "Check the configured lights before changing settings"))
+            # Entry options are the single durable configuration for entities and Configure.
+            self.hass.config_entries.async_update_entry(self.entry, options={**self.entry.options,
+                "wake_enabled": self.schedule_enabled, "bed_enabled": self.bed_schedule_enabled, key: value})
+            self.config = updated
             self.notify()
 
     async def set_schedule(self, enabled, mode="wake"):

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0
+
+- Expose two time, five number and two color-mode select entities for routine configuration.
+- Share persistent options between entities and Configure, with serialized writes and active-run guards.
+- Filter native color-mode choices by bulb capabilities; preserve existing controls and entity identities.
+
 ## 0.3.0
 
 - Add independent routine white-temperature/RGB color settings, applied with the starting brightness and restored with an active run. Validate bulb capabilities before sending commands.

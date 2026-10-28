@@ -65,5 +65,16 @@
       "same_start_time": "Choose different start times when both automatic routines are enabled.",
       "unsupported_color": "A selected bulb cannot use this color mode. For tunable-white bulbs choose White temperature, not RGB."
     }
+  },
+  "entity": {
+    "select": {
+      "routine_color_mode": {
+        "state": {
+          "unchanged": "Keep current color",
+          "temperature": "White temperature",
+          "rgb": "RGB color"
+        }
+      }
+    }
   }
 }

@@ -1,7 +1,7 @@
 """Configurable wake-up and bedtime lighting."""
 from .controller import Controller
 
-PLATFORMS = ["switch", "sensor"]
+PLATFORMS = ["switch", "sensor", "number", "time", "select"]
 
 async def async_setup_entry(hass, entry):
     controller = entry.runtime_data = Controller(hass, entry)
