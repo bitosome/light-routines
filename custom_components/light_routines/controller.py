@@ -44,6 +44,7 @@ class Controller:
         data = await self.store.async_load() or {}
         self.session = data.get("session")
         self.schedule_enabled = self.entry.options.get("wake_enabled", self.entry.data.get("wake_enabled", data.get("schedule_enabled", True)))
+        self.config["wake_enabled"] = self.schedule_enabled
         self.last_bed_date = data.get("last_bed_date")
         self.last_wake_date = data.get("last_wake_date")
         if self.session:
@@ -80,7 +81,7 @@ class Controller:
 
     async def update_config(self):
         async with self.lock:
-            self.config = {**DEFAULTS, **self.entry.data, **self.entry.options}
+            self.config = {**self.config, **self.entry.data, **self.entry.options}
             self.schedule_enabled = self.config["wake_enabled"]
             self.bed_schedule_enabled = self.config["bed_enabled"]
             await self.save()
@@ -96,7 +97,7 @@ class Controller:
             else:
                 self.bed_schedule_enabled = enabled
             self.config[f"{mode}_enabled"] = enabled
-            self.hass.config_entries.async_update_entry(self.entry, options={**self.entry.options, f"{mode}_enabled": enabled})
+            self.hass.config_entries.async_update_entry(self.entry, options={**self.entry.options, "wake_enabled": self.schedule_enabled, "bed_enabled": self.bed_schedule_enabled})
             await self.save()
             self.notify()
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1
+
+- Preserve a previously disabled wake-up schedule when upgrading and enabling the new bedtime schedule.
+
 ## 0.2.0
 
 - Expose independent daily wake-up and bedtime start toggles/times in native configuration.

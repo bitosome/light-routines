@@ -150,3 +150,20 @@ async def test_same_enabled_schedule_time_rejected(hass,routine):
     data={**DEFAULTS,**entry.data,'bed_enabled':True,'bed_time':'07:15:00'}
     result=await hass.config_entries.options.async_configure(form['flow_id'],data)
     assert result['errors']=={'base':'same_start_time'}
+
+async def test_legacy_disabled_schedule_survives_bed_switch(hass,routine):
+    entry,_=routine;c=entry.runtime_data
+    # Old releases persisted schedule enablement only in the runtime store.
+    c.schedule_enabled=False
+    await c.save()
+    from unittest.mock import AsyncMock
+    from types import SimpleNamespace
+    from custom_components.light_routines.controller import Controller
+    data={k:v for k,v in entry.data.items() if k not in ('wake_enabled','bed_enabled','bed_time')}
+    legacy=Controller(hass,SimpleNamespace(data=data,options={},entry_id='legacy'))
+    legacy.store.async_load=AsyncMock(return_value={'schedule_enabled':False})
+    await legacy.setup()
+    assert legacy.config['wake_enabled'] is False
+    await legacy.update_config()
+    assert legacy.schedule_enabled is False
+    await legacy.close()
