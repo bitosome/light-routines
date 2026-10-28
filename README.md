@@ -21,7 +21,7 @@ Each entry is one room. A bulb cannot belong to two entries. Configure changes t
 
 ## Reliability and limits
 
-The controller uses absolute timestamps and short, five-second steps (native short transitions where supported), so it can cancel a fade instead of leaving a 30-minute Zigbee transition running. Duplicate brightness commands are skipped. Only the selected bulbs are controlled; color temperature is left unchanged. A light must be powered and reachable.
+The controller uses absolute timestamps and short, five-second steps (native short transitions where supported), so it can cancel a fade instead of leaving a 30-minute Zigbee transition running. Duplicate brightness commands are skipped. Only the selected bulbs are controlled. Each routine can keep the current color, apply a white temperature, or apply RGB. Choose the mode first: the temperature value is used only for White temperature; the color picker is used only for RGB. All selected bulbs must support the chosen mode. White temperature is clamped to each bulb’s supported Kelvin range. Color and starting brightness are sent together, including when an active run resumes; already-off bulbs stay off during bedtime. Existing configurations keep their color until a color mode is selected. A light must be powered and reachable.
 
 An active routine and schedule enablement are persisted before commands are sent. After a Home Assistant restart, an unfinished routine resumes after startup. An already expired routine is marked interrupted without turning lights on late. Missed daily schedules are not replayed later; one automatic start is allowed per local calendar date. Cancelling during the scheduled minute does not restart it. Disabling the schedule does not cancel an already active fade.
 
@@ -30,3 +30,5 @@ Light failures stop the routine and surface in Status. Other lights may already 
 ## Development
 
 Python 3.14; `pip install -r requirements-test.txt`, then `pytest -q`. Tests use real Home Assistant lifecycle fixtures and mocked light services, never physical devices.
+
+**Current brightness** reports the mean of the configured bulbs’ actual reported brightness (off = 0%), also available as `current_brightness_pct` on the routine switches. Missing/unavailable brightness makes the aggregate unavailable, rather than presenting a misleading percentage. This is actual light telemetry, not elapsed routine progress or a commanded estimate.

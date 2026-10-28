@@ -6,11 +6,12 @@ from datetime import timedelta
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
 from homeassistant.core import CoreState, callback
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.helpers.event import async_track_time_interval, async_track_state_change_event
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, DEFAULTS
+from .color import color_command, routine_color
 
 
 def levels(session, now):
@@ -39,6 +40,8 @@ class Controller:
         self.last_levels = {}
         self.unsub = None
         self.closed = False
+        self.color_applied = set()
+        self.light_unsub = None
 
     async def setup(self):
         data = await self.store.async_load() or {}
@@ -49,10 +52,33 @@ class Controller:
         self.last_wake_date = data.get("last_wake_date")
         if self.session:
             self.status = "Resuming"
+        self.watch_lights()
         if self.hass.state == CoreState.running:
             self.activate()
         else:
             self.unsub = self.hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, self.activate)
+
+    @callback
+    def watch_lights(self):
+        if self.light_unsub:
+            self.light_unsub()
+        self.light_unsub = async_track_state_change_event(self.hass, self.config["lights"], self.light_changed)
+
+    @callback
+    def light_changed(self, event):
+        self.notify()
+
+    def brightness(self):
+        values = []
+        for light in self.config["lights"]:
+            state = self.hass.states.get(light)
+            if not state or state.state not in ("on", "off"):
+                return None
+            value = state.attributes.get("brightness") if state.state == "on" else 0
+            if not isinstance(value, (int, float)) or not math.isfinite(value):
+                return None
+            values.append(max(0, min(255, value)) * 100 / 255)
+        return round(sum(values) / len(values), 1) if values else None
 
     @callback
     def activate(self, event=None):
@@ -71,6 +97,9 @@ class Controller:
         self.closed = True
         if self.unsub:
             self.unsub()
+        if self.light_unsub:
+            self.light_unsub()
+            self.light_unsub = None
         async with self.lock:
             await self.save()
 
@@ -81,9 +110,12 @@ class Controller:
 
     async def update_config(self):
         async with self.lock:
+            if self.closed:
+                return
             self.config = {**self.config, **self.entry.data, **self.entry.options}
             self.schedule_enabled = self.config["wake_enabled"]
             self.bed_schedule_enabled = self.config["bed_enabled"]
+            self.watch_lights()
             await self.save()
             self.notify()
 
@@ -112,12 +144,14 @@ class Controller:
             return
         # Check all bulbs before replacing a running sequence.
         initial = {}
+        color = routine_color(self.config, mode)
         for light in self.config["lights"]:
             state = self.hass.states.get(light)
             if not state or state.state not in ("on", "off"):
                 raise HomeAssistantError(f"Light unavailable: {light}")
             if mode == "bed" and state.state == "on" and not isinstance(state.attributes.get("brightness"), (int, float)):
                 raise HomeAssistantError(f"Brightness unavailable: {light}")
+            color_command(state, color)
             initial[light] = (state.attributes.get("brightness", 0) or 0) if state.state == "on" else 0
         if self.session:
             await self._stop()
@@ -127,8 +161,9 @@ class Controller:
         now = dt_util.utcnow().timestamp()
         self.session = {"mode": mode, "start": now, "end": now + 60 * self.config[f"{mode}_duration"],
                         "initial": initial if mode == "bed" else {light: 1 for light in initial},
-                        "target": round(self.config["wake_brightness"] * 255 / 100) if mode == "wake" else 0}
+                        "target": round(self.config["wake_brightness"] * 255 / 100) if mode == "wake" else 0, "color": color}
         self.last_levels = {}
+        self.color_applied = set()
         self.status = "Waking up" if mode == "wake" else "Going to bed"
         await self.save()  # Persist intent before commanding lights.
         try:
@@ -164,7 +199,7 @@ class Controller:
                 self.notify()
                 raise HomeAssistantError("; ".join(errors))
 
-    async def command(self, light, value, transition):
+    async def command(self, light, value, transition, color=None):
         state = self.hass.states.get(light)
         if not state or state.state not in ("on", "off"):
             raise HomeAssistantError(f"Light unavailable: {light}")
@@ -173,13 +208,18 @@ class Controller:
             data["transition"] = transition
         if value > 0:
             data["brightness"] = max(1, min(255, value))
+            if color:
+                data.update(color_command(state, color))
         await self.hass.services.async_call("light", "turn_on" if value > 0 else "turn_off", data, blocking=True)
 
     async def apply(self, now, transition=5):
         values = levels(self.session, now)
         for light, value in values.items():
             if self.last_levels.get(light) != value:
-                await self.command(light, value, 0 if now >= self.session["end"] else transition)
+                await self.command(light, value, 0 if now >= self.session["end"] else transition,
+                                   self.session.get("color") if light not in self.color_applied else None)
+                if value > 0:
+                    self.color_applied.add(light)
                 self.last_levels[light] = value
         if now >= self.session["end"]:
             self.session = None

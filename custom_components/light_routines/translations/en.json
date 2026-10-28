@@ -4,7 +4,7 @@
     "step": {
       "user": {
         "title": "Light routines",
-        "description": "Set each routine\u2019s duration in minutes. Automatic starts are optional; manual start/stop switches always remain available. Start times use Home Assistant\u2019s local timezone.",
+        "description": "Choose a color mode for each routine. White temperature is applied only in White temperature mode; the RGB picker applies only in RGB mode. Temperature is limited to each bulb\u2019s supported range. All selected bulbs must support the chosen mode. Manual start/stop remains available when automatic starts are disabled.",
         "data": {
           "name": "Room / routine name",
           "lights": "Dimmable lights",
@@ -14,7 +14,13 @@
           "wake_brightness": "Maximum wake-up brightness",
           "wake_enabled": "Start wake-up automatically every day",
           "bed_enabled": "Start bedtime automatically every day",
-          "bed_time": "Daily bedtime start time"
+          "bed_time": "Daily bedtime start time",
+          "wake_color_mode": "Wake-up color mode",
+          "wake_color_temperature": "Wake-up white temperature",
+          "wake_color_rgb": "Wake-up RGB color",
+          "bed_color_mode": "Bedtime color mode",
+          "bed_color_temperature": "Bedtime white temperature",
+          "bed_color_rgb": "Bedtime RGB color"
         }
       }
     },
@@ -23,7 +29,8 @@
       "not_dimmable": "Every selected light must expose brightness control.",
       "lights_in_use": "A selected light already belongs to another Light Routines entry.",
       "routine_active": "Stop the active routine before changing its settings.",
-      "same_start_time": "Choose different start times when both automatic routines are enabled."
+      "same_start_time": "Choose different start times when both automatic routines are enabled.",
+      "unsupported_color": "A selected bulb cannot use this color mode. For tunable-white bulbs choose White temperature, not RGB."
     }
   },
   "options": {
@@ -39,9 +46,15 @@
           "wake_brightness": "Maximum wake-up brightness",
           "wake_enabled": "Start wake-up automatically every day",
           "bed_enabled": "Start bedtime automatically every day",
-          "bed_time": "Daily bedtime start time"
+          "bed_time": "Daily bedtime start time",
+          "wake_color_mode": "Wake-up color mode",
+          "wake_color_temperature": "Wake-up white temperature",
+          "wake_color_rgb": "Wake-up RGB color",
+          "bed_color_mode": "Bedtime color mode",
+          "bed_color_temperature": "Bedtime white temperature",
+          "bed_color_rgb": "Bedtime RGB color"
         },
-        "description": "Set each routine\u2019s duration in minutes. Automatic starts are optional; manual start/stop switches always remain available. Start times use Home Assistant\u2019s local timezone."
+        "description": "Choose a color mode for each routine. White temperature is applied only in White temperature mode; the RGB picker applies only in RGB mode. Temperature is limited to each bulb\u2019s supported range. All selected bulbs must support the chosen mode. Manual start/stop remains available when automatic starts are disabled."
       }
     },
     "error": {
@@ -49,7 +62,8 @@
       "not_dimmable": "Every selected light must expose brightness control.",
       "lights_in_use": "A selected light already belongs to another Light Routines entry.",
       "routine_active": "Stop the active routine before changing its settings.",
-      "same_start_time": "Choose different start times when both automatic routines are enabled."
+      "same_start_time": "Choose different start times when both automatic routines are enabled.",
+      "unsupported_color": "A selected bulb cannot use this color mode. For tunable-white bulbs choose White temperature, not RGB."
     }
   }
 }

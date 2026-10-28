@@ -4,6 +4,16 @@ from homeassistant.config_entries import ConfigFlow, OptionsFlow
 from homeassistant.core import callback
 from homeassistant.helpers import selector
 from .const import DOMAIN, DEFAULTS
+from .color import color_command, routine_color
+from homeassistant.exceptions import HomeAssistantError
+
+
+def color_schema(values, mode):
+    return {
+        vol.Required(f"{mode}_color_mode", default=values[f"{mode}_color_mode"]): selector.SelectSelector(selector.SelectSelectorConfig(options=[{"value": "unchanged", "label": "Keep current color"}, {"value": "temperature", "label": "White temperature"}, {"value": "rgb", "label": "RGB color (color bulbs only)"}], mode="dropdown")),
+        vol.Required(f"{mode}_color_temperature", default=values[f"{mode}_color_temperature"]): selector.NumberSelector(selector.NumberSelectorConfig(min=1500, max=6500, step=1, mode="box", unit_of_measurement="K")),
+        vol.Required(f"{mode}_color_rgb", default=values[f"{mode}_color_rgb"]): selector.ColorRGBSelector(),
+    }
 
 
 def schema(values):
@@ -14,9 +24,11 @@ def schema(values):
         vol.Required("wake_time", default=values["wake_time"]): selector.TimeSelector(),
         vol.Required("wake_duration", default=values["wake_duration"]): selector.NumberSelector(selector.NumberSelectorConfig(min=1, max=120, step=1, mode="box", unit_of_measurement="min")),
         vol.Required("wake_brightness", default=values["wake_brightness"]): selector.NumberSelector(selector.NumberSelectorConfig(min=1, max=100, step=1, mode="box", unit_of_measurement="%")),
+        **color_schema(values, "wake"),
         vol.Required("bed_enabled", default=values["bed_enabled"]): selector.BooleanSelector(),
         vol.Required("bed_time", default=values["bed_time"]): selector.TimeSelector(),
         vol.Required("bed_duration", default=values["bed_duration"]): selector.NumberSelector(selector.NumberSelectorConfig(min=1, max=120, step=1, mode="box", unit_of_measurement="min")),
+        **color_schema(values, "bed"),
     })
 
 
@@ -32,6 +44,11 @@ def validate(hass, data, entry_id=None):
         state = hass.states.get(light)
         if not state or not set(state.attributes.get("supported_color_modes", [])) - {"onoff", "unknown"}:
             return "not_dimmable"
+        try:
+            for mode in ("wake", "bed"):
+                color_command(state, routine_color(data, mode))
+        except HomeAssistantError:
+            return "unsupported_color"
     return None
 
 

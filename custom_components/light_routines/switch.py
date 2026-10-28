@@ -24,7 +24,7 @@ class RoutineSwitch(RoutineEntity, SwitchEntity):
 
     @property
     def extra_state_attributes(self):
-        return {"remaining_seconds": self.controller.remaining(self.key), "routine_status": self.controller.status,
+        return {"current_brightness_pct": self.controller.brightness(), "brightness_aggregation": "mean of configured lights; off = 0", "remaining_seconds": self.controller.remaining(self.key), "routine_status": self.controller.status,
                 "scheduled_time": self.controller.config["wake_time"] if self.key in ("wake", "schedule") else self.controller.config["bed_time"]}
 
     async def async_turn_on(self, **kwargs):

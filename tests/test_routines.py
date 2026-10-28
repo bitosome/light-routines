@@ -167,3 +167,59 @@ async def test_legacy_disabled_schedule_survives_bed_switch(hass,routine):
     await legacy.update_config()
     assert legacy.schedule_enabled is False
     await legacy.close()
+
+async def test_routine_temperature_applied_at_start_and_restored(hass,routine):
+    entry,calls=routine;c=entry.runtime_data
+    for i in range(1,4):
+        hass.states.async_set(f'light.test_{i}','off',{'supported_color_modes':['color_temp'],'supported_features':32,'min_color_temp_kelvin':2202,'max_color_temp_kelvin':4000})
+    c.config.update(wake_color_mode='temperature',wake_color_temperature=2700)
+    await c.start('wake')
+    assert all(d['color_temp_kelvin']==2700 and d['brightness']==1 for _,d in calls[-3:])
+    await c.tick(dt_util.utcnow()+timedelta(minutes=5))
+    assert all('color_temp_kelvin' not in d for _,d in calls[-3:])
+    await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    await entry.runtime_data.tick(dt_util.utcnow()+timedelta(minutes=10))
+    assert all(d['color_temp_kelvin']==2700 for _,d in calls[-3:])
+
+async def test_bed_color_keeps_off_bulbs_off(hass,routine):
+    entry,calls=routine;c=entry.runtime_data
+    for i,b in enumerate([200,80,0],1):
+        hass.states.async_set(f'light.test_{i}','on' if b else 'off',{'brightness':b,'supported_color_modes':['rgb'],'supported_features':32})
+    c.config.update(bed_color_mode='rgb',bed_color_rgb=[255,80,10])
+    await c.start('bed')
+    assert all(d['rgb_color']==[255,80,10] for _,d in calls[:2])
+    assert calls[2][0]=='turn_off' and 'rgb_color' not in calls[2][1]
+
+async def test_unsupported_color_does_not_partially_start(hass,routine):
+    entry,calls=routine;c=entry.runtime_data
+    c.config.update(wake_color_mode='rgb')
+    with pytest.raises(HomeAssistantError):await c.start('wake')
+    assert not calls and c.session is None
+
+async def test_brightness_uses_actual_states_and_reports_missing(hass,routine):
+    entry,_=routine;c=entry.runtime_data
+    assert c.brightness()==36.6
+    hass.states.async_set('light.test_1','on',{'brightness':255})
+    await hass.async_block_till_done()
+    assert c.brightness()==43.8
+    assert hass.states.get('switch.test_room_wake_up').attributes['current_brightness_pct']==43.8
+    hass.states.async_set('light.test_2','unavailable')
+    await hass.async_block_till_done()
+    assert c.brightness() is None
+    assert hass.states.get('switch.test_room_wake_up').attributes['current_brightness_pct'] is None
+
+async def test_color_validation_in_options(hass,routine):
+    entry,_=routine
+    result=await hass.config_entries.options.async_init(entry.entry_id)
+    data={**DEFAULTS,**entry.data,'wake_color_mode':'rgb'}
+    result=await hass.config_entries.options.async_configure(result['flow_id'],data)
+    assert result['errors']=={'base':'unsupported_color'}
+
+
+def test_temperature_clamps_to_bulb_range():
+    from types import SimpleNamespace
+    from custom_components.light_routines.color import color_command
+    state=SimpleNamespace(attributes={'supported_color_modes':['color_temp'],'min_color_temp_kelvin':2202,'max_color_temp_kelvin':4000})
+    assert color_command(state,{'mode':'temperature','kelvin':1800})=={'color_temp_kelvin':2202}
+    assert color_command(state,{'mode':'temperature','kelvin':6500})=={'color_temp_kelvin':4000}

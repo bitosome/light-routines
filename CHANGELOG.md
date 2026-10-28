@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0
+
+- Add independent routine white-temperature/RGB color settings, applied with the starting brightness and restored with an active run. Validate bulb capabilities before sending commands.
+- Expose live average brightness as a sensor and switch attribute, updated on bulb-state changes.
+- Safely remove light-state listeners during reload and ignore queued option updates after unload.
+
 ## 0.2.1
 
 - Preserve a previously disabled wake-up schedule when upgrading and enabling the new bedtime schedule.
