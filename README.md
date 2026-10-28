@@ -6,7 +6,7 @@ A configurable HACS integration for gentle daily wake-up lighting and manual bed
 
 1. In HACS, add `https://github.com/bitosome/light-routines` as a custom **Integration** repository, then download it.
 2. Restart Home Assistant if prompted.
-3. Add **Light Routines** under Settings → Devices & services → Add integration (also available among helpers).
+3. Add **Light Routines** under Settings → Devices & services → Add integration.
 4. Choose a name, one or more dimmable lights, daily wake-up time, durations and wake-up target.
 
 Each entry is one room. A bulb cannot belong to two entries. Configure changes through the integration's options after stopping any running routine. Settings are stored by Home Assistant and shared by all users.
