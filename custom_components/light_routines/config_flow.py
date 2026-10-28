@@ -4,7 +4,7 @@ from homeassistant.config_entries import ConfigFlow, OptionsFlow
 from homeassistant.core import callback
 from homeassistant.helpers import selector
 from .const import DOMAIN, DEFAULTS
-from .settings import validate
+from .settings import validate, normalize
 
 
 def color_schema(values, mode):
@@ -40,7 +40,7 @@ class LightRoutinesFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             error = validate(self.hass, user_input)
             if not error:
-                return self.async_create_entry(title=user_input["name"], data=user_input)
+                return self.async_create_entry(title=user_input["name"], data=normalize(user_input))
             errors["base"] = error
         return self.async_show_form(step_id="user", data_schema=schema({**DEFAULTS, **(user_input or {})}), errors=errors)
 
@@ -55,9 +55,10 @@ class RoutineOptions(OptionsFlow):
         errors = {}
         if user_input is not None:
             controller = getattr(self.config_entry, "runtime_data", None)
-            error = "routine_active" if controller and controller.session else validate(self.hass, user_input, self.config_entry.entry_id)
+            lights_changed = controller and controller.session and set(user_input["lights"]) != set(controller.session["initial"])
+            error = "routine_active" if lights_changed else validate(self.hass, user_input, self.config_entry.entry_id)
             if not error:
-                return self.async_create_entry(data=user_input)
+                return self.async_create_entry(data=normalize(user_input))
             errors["base"] = error
         controller = getattr(self.config_entry, "runtime_data", None)
         current = {"wake_enabled": controller.schedule_enabled, "bed_enabled": controller.bed_schedule_enabled} if controller else {}

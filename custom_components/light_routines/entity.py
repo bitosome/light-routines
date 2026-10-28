@@ -23,3 +23,7 @@ class RoutineEntity(Entity):
     @callback
     def changed(self):
         self.async_write_ha_state()
+
+    @property
+    def extra_state_attributes(self):
+        return {"settings_apply_to": "next_run", "active_routine": self.controller.session["mode"] if self.controller.session else None}

@@ -18,6 +18,10 @@ class Remaining(RoutineEntity, SensorEntity):
 
 class Status(RoutineEntity, SensorEntity):
     @property
+    def extra_state_attributes(self):
+        return {"last_error": self.controller.last_error}
+
+    @property
     def native_value(self):
         return self.controller.status
 

@@ -42,12 +42,20 @@ async def test_color_entity_capabilities_and_persistence(hass,routine):
     await entry.runtime_data.start('wake')
     assert all(d['color_temp_kelvin']==3000 for _,d in calls[-3:])
 
-async def test_active_fade_rejects_setting_changes(hass,routine):
-    entry,_=routine
+async def test_active_fade_saves_settings_without_changing_running_snapshot(hass,routine):
+    entry,calls=routine
     await entry.runtime_data.start('wake')
-    with pytest.raises(HomeAssistantError,match='Stop the active routine'):
-        await hass.services.async_call('number','set_value',{'entity_id':'number.test_room_wake_up_duration','value':10},blocking=True)
-    assert entry.runtime_data.config['wake_duration']==30
+    session=dict(entry.runtime_data.session);count=len(calls)
+    await hass.services.async_call('number','set_value',{'entity_id':'number.test_room_wake_up_duration','value':10},blocking=True)
+    await hass.services.async_call('number','set_value',{'entity_id':'number.test_room_wake_up_maximum_brightness','value':50},blocking=True)
+    await hass.async_block_till_done()
+    assert entry.runtime_data.config['wake_duration']==10
+    assert entry.runtime_data.session==session and len(calls)==count
+    await entry.runtime_data.stop('wake')
+    await entry.runtime_data.start('wake')
+    assert entry.runtime_data.session['target']==128
+    assert entry.runtime_data.session['end']-entry.runtime_data.session['start']==600
+
 
 async def test_invalid_numbers_and_schedule_conflicts_rejected(hass,routine):
     entry,_=routine;c=entry.runtime_data

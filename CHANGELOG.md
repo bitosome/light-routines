@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.0
+
+- Allow parameters to be saved during active routines for the next run; retain the current fade snapshot across restart. Only changing bulbs requires stopping first.
+- Cancel at reported brightness and keep already-off lights off; finish an all-off bedtime request immediately.
+- Wait for bulb availability during restart recovery, without late replay after the original run expires.
+- Bound command waits, skip overlapping timer work, reject invalid restored runs and retain useful error details.
+- Prevent same-minute manual-cancel restarts and validate numeric/time inputs consistently across Configure and entities.
+- Expand mocked Home Assistant regression coverage to 77 passing tests.
+
 ## 0.4.0
 
 - Expose two time, five number and two color-mode select entities for routine configuration.

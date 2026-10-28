@@ -4,7 +4,7 @@
     "step": {
       "user": {
         "title": "Light routines",
-        "description": "Choose a color mode for each routine. White temperature is applied only in White temperature mode; the RGB picker applies only in RGB mode. Temperature is limited to each bulb\u2019s supported range. All selected bulbs must support the chosen mode. Manual start/stop remains available when automatic starts are disabled.",
+        "description": "Choose a color mode for each routine. White temperature is applied only in White temperature mode; the RGB picker applies only in RGB mode. Temperature is limited to each bulb\u2019s supported range. All selected bulbs must support the chosen mode. Manual start/stop remains available when automatic starts are disabled. Changes are saved for the next run; an active fade keeps its original duration, target and color. Start times use whole minutes.",
         "data": {
           "name": "Room / routine name",
           "lights": "Dimmable lights",
@@ -28,9 +28,11 @@
       "required_values": "Enter a name and select at least one light.",
       "not_dimmable": "Every selected light must expose brightness control.",
       "lights_in_use": "A selected light already belongs to another Light Routines entry.",
-      "routine_active": "Stop the active routine before changing its settings.",
+      "routine_active": "Stop the active routine before changing its selected lights. Other settings can be saved for the next run.",
       "same_start_time": "Choose different start times when both automatic routines are enabled.",
-      "unsupported_color": "A selected bulb cannot use this color mode. For tunable-white bulbs choose White temperature, not RGB."
+      "unsupported_color": "A selected bulb cannot use this color mode. For tunable-white bulbs choose White temperature, not RGB.",
+      "invalid_number": "Use whole numbers within the displayed limits.",
+      "invalid_time": "Enter a valid local start time."
     }
   },
   "options": {
@@ -54,16 +56,18 @@
           "bed_color_temperature": "Bedtime white temperature",
           "bed_color_rgb": "Bedtime RGB color"
         },
-        "description": "Choose a color mode for each routine. White temperature is applied only in White temperature mode; the RGB picker applies only in RGB mode. Temperature is limited to each bulb\u2019s supported range. All selected bulbs must support the chosen mode. Manual start/stop remains available when automatic starts are disabled."
+        "description": "Choose a color mode for each routine. White temperature is applied only in White temperature mode; the RGB picker applies only in RGB mode. Temperature is limited to each bulb\u2019s supported range. All selected bulbs must support the chosen mode. Manual start/stop remains available when automatic starts are disabled. Changes are saved for the next run; an active fade keeps its original duration, target and color. Start times use whole minutes."
       }
     },
     "error": {
       "required_values": "Enter a name and select at least one light.",
       "not_dimmable": "Every selected light must expose brightness control.",
       "lights_in_use": "A selected light already belongs to another Light Routines entry.",
-      "routine_active": "Stop the active routine before changing its settings.",
+      "routine_active": "Stop the active routine before changing its selected lights. Other settings can be saved for the next run.",
       "same_start_time": "Choose different start times when both automatic routines are enabled.",
-      "unsupported_color": "A selected bulb cannot use this color mode. For tunable-white bulbs choose White temperature, not RGB."
+      "unsupported_color": "A selected bulb cannot use this color mode. For tunable-white bulbs choose White temperature, not RGB.",
+      "invalid_number": "Use whole numbers within the displayed limits.",
+      "invalid_time": "Enter a valid local start time."
     }
   },
   "entity": {

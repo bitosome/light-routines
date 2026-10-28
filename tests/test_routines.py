@@ -87,17 +87,17 @@ async def test_command_error_stops_sequence(hass,routine):
     await c.tick(dt_util.utcnow()+timedelta(minutes=10))
     assert c.session is None and 'failed' in c.status
 
-async def test_options_block_during_run(hass,routine):
+async def test_options_during_run_save_next_run_settings(hass,routine):
     entry,calls=routine
     await entry.runtime_data.start('wake')
+    session=dict(entry.runtime_data.session);count=len(calls)
     result=await hass.config_entries.options.async_init(entry.entry_id)
-    result=await hass.config_entries.options.async_configure(result['flow_id'],dict(entry.data))
-    assert result['errors']=={'base':'routine_active'}
-    await entry.runtime_data.stop('wake')
     result=await hass.config_entries.options.async_configure(result['flow_id'],{**entry.data,'wake_duration':20})
     assert result['type']=='create_entry'
     await hass.async_block_till_done()
     assert entry.runtime_data.config['wake_duration']==20
+    assert entry.runtime_data.session==session and len(calls)==count
+
 
 async def test_config_rejects_overlapping_lights(hass,routine):
     entry,_=routine
