@@ -50,3 +50,7 @@ Parameters can be edited while a routine is running. Changes are saved for the n
 ## Regression checks
 
 The test suite covers settings edits during active fades, restart persistence of the current run versus next-run parameters, delayed bulb availability on startup, invalid saved runs, failed storage before startup, individual cancellation brightness, slow/failed light commands, duplicate starts in a scheduled minute and across the repeated daylight-saving hour, capability validation and monotonic fade endpoints. All device calls are mocked. Firmware-specific transition behavior still requires observation on the actual bulbs.
+
+## Integration artwork
+
+Native Home Assistant branding uses an original sunrise/fade mark in light and dark themes. Editable SVG sources and standard/high-resolution PNGs live in `custom_components/light_routines/brand/`. Rebuild PNGs with `uv run --with cairosvg==2.9.1 python tools/render_branding.py`. After first installing branding, restart Home Assistant to refresh integration metadata, then reload the integration list. Artwork is covered by this repository’s MIT license.

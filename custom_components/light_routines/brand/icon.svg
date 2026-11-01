@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none">
+  <title>Light Routines</title>
+  <desc>A rising or setting sun above three fading levels of light.</desc>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="#f0edf7"/>
+  <rect x="9" y="9" width="238" height="238" rx="55" stroke="#d8d2e7" stroke-width="2"/>
+  <path d="M128 57V74M76 79L88 91M180 79L168 91" stroke="#a96315" stroke-width="12" stroke-linecap="round"/>
+  <path d="M84 141A44 44 0 0 1 172 141" stroke="#a96315" stroke-width="12" stroke-linecap="round"/>
+  <path d="M52 145H204" stroke="#8051a7" stroke-width="12" stroke-linecap="round"/>
+  <path d="M72 174H184M94 202H162" stroke="#8051a7" stroke-width="12" stroke-linecap="round"/>
+</svg>

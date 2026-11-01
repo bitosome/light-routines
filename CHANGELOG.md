@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.1 — 2026-11-01
+
+- Add native Home Assistant branding for the integration list, replacing the missing-icon placeholder. Sunrise/fade artwork includes light/dark and high-resolution variants.
+- Preserve routine behavior, settings and entity identities.
+
 ## 0.5.0
 
 - Allow parameters to be saved during active routines for the next run; retain the current fade snapshot across restart. Only changing bulbs requires stopping first.
