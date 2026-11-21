@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.0 — 2026-11-22
+
+- Stop the active routine when one of its lights is switched on or off by anything other than the routine (wall switch, remote, dashboard, automation or a light group containing it). The run switch turns off, status shows "Stopped · light switched manually", and no further commands are sent, so the lights stay as they were left.
+- Brightness or color edits, and bulbs becoming unavailable, still do not cancel a run. The routine's own on/off steps are recognised and never cancel it.
+
 ## 0.5.1 — 2026-11-01
 
 - Add native Home Assistant branding for the integration list, replacing the missing-icon placeholder. Sunrise/fade artwork includes light/dark and high-resolution variants.

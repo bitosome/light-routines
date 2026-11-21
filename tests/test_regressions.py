@@ -24,13 +24,15 @@ async def test_cancel_preserves_reported_levels_and_does_not_relight_off_bulbs(h
     entry,calls=routine;c=entry.runtime_data
     await c.start('wake')
     hass.states.async_set('light.test_1','on',{'brightness':67,'supported_features':32})
-    hass.states.async_set('light.test_2','off',{'brightness':200,'supported_features':32})
-    hass.states.async_set('light.test_3','on',{'brightness':101,'supported_features':32})
+    hass.states.async_set('light.test_2','on',{'brightness':101,'supported_features':32})
+    # Never reported on, so still off (a reported on-to-off flip would be a manual stop).
+    hass.states.async_set('light.test_3','off',{'brightness':200,'supported_features':32})
     await c.stop('wake')
+    assert c.status=='Cancelled'
     assert calls[-3:]==[
         ('turn_on',{'entity_id':'light.test_1','brightness':67,'transition':0}),
-        ('turn_off',{'entity_id':'light.test_2','transition':0}),
-        ('turn_on',{'entity_id':'light.test_3','brightness':101,'transition':0}),
+        ('turn_on',{'entity_id':'light.test_2','brightness':101,'transition':0}),
+        ('turn_off',{'entity_id':'light.test_3','transition':0}),
     ]
     assert c.session is None
 
@@ -229,3 +231,70 @@ async def test_duplicate_schedule_guard_survives_reload(hass,routine):
     c.config['wake_time']=dt_util.as_local(now).strftime('%H:%M:00')
     await c.tick(now)
     assert c.session is None and len(calls)==count
+
+
+ATTRS={'supported_features':32,'supported_color_modes':['brightness']}
+
+async def test_manual_off_during_wake_stops_routine_without_commands(hass,routine):
+    entry,calls=routine;c=entry.runtime_data
+    await c.start('wake')
+    for i in range(1,4):  # Bulbs report the routine's own switch-on.
+        hass.states.async_set(f'light.test_{i}','on',{**ATTRS,'brightness':1})
+    await hass.async_block_till_done()
+    assert c.session and hass.states.get('switch.test_room_wake_up').state=='on'
+    count=len(calls)
+    hass.states.async_set('light.test_2','off',ATTRS)
+    await hass.async_block_till_done()
+    assert c.session is None and c.status=='Stopped · light switched manually'
+    assert hass.states.get('switch.test_room_wake_up').state=='off'
+    await c.tick(dt_util.utcnow()+timedelta(minutes=10))
+    assert len(calls)==count
+    await hass.config_entries.async_reload(entry.entry_id)
+    assert entry.runtime_data.session is None
+
+
+async def test_manual_toggle_during_bed_stops_routine(hass,routine):
+    entry,calls=routine;c=entry.runtime_data
+    await c.start('bed');count=len(calls)
+    hass.states.async_set('light.test_3','on',{**ATTRS,'brightness':120})  # Was off; switched on.
+    await hass.async_block_till_done()
+    assert c.session is None and len(calls)==count
+    assert hass.states.get('switch.test_room_bedtime').state=='off'
+    await c.start('bed');count=len(calls)
+    hass.states.async_set('light.test_1','off',ATTRS)
+    await hass.async_block_till_done()
+    assert c.session is None and len(calls)==count
+
+
+async def test_own_steps_brightness_edits_and_availability_do_not_stop(hass,routine):
+    entry,calls=routine;c=entry.runtime_data
+    await c.start('bed')
+    hass.states.async_set('light.test_1','on',{**ATTRS,'brightness':33})
+    hass.states.async_set('light.test_2','unavailable')
+    hass.states.async_set('light.test_2','on',{**ATTRS,'brightness':80})
+    await hass.async_block_till_done()
+    assert c.session
+    await c.tick(dt_util.utcnow()+timedelta(minutes=31))
+    for i in (1,2):  # Final switch-off reported after the run ended.
+        hass.states.async_set(f'light.test_{i}','off',ATTRS)
+    await hass.async_block_till_done()
+    assert c.status=='Completed'
+
+
+async def test_manual_off_while_step_in_flight_keeps_light_off(hass,routine):
+    entry,calls=routine;c=entry.runtime_data
+    await c.start('wake')
+    for i in range(1,4):
+        hass.states.async_set(f'light.test_{i}','on',{**ATTRS,'brightness':1})
+    await hass.async_block_till_done()
+    original=c.hass.services.async_call
+    async def racing(domain,service,data,**kwargs):
+        if data['entity_id']=='light.test_1' and service=='turn_on':
+            hass.states.async_set('light.test_1','off',ATTRS)
+        return await original(domain,service,data,**kwargs)
+    count=len(calls)
+    with patch.object(type(hass.services),'async_call',side_effect=racing):
+        await c.tick(dt_util.utcnow()+timedelta(minutes=15))
+    await hass.async_block_till_done()
+    assert c.session is None and c.status=='Stopped · light switched manually'
+    assert [(s,d['entity_id']) for s,d in calls[count:]]==[('turn_on','light.test_1'),('turn_off','light.test_1')]

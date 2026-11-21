@@ -70,6 +70,9 @@ class Controller:
         self.closed = False
         self.color_applied = set()
         self.light_unsub = None
+        self.expected = {}
+        self.commanding = None
+        self.manual = False
 
     async def setup(self):
         data = await self.store.async_load() or {}
@@ -106,6 +109,41 @@ class Controller:
     @callback
     def light_changed(self, event):
         self.notify()
+        session, light = self.session, event.data["entity_id"]
+        old, new = event.data["old_state"], event.data["new_state"]
+        if not session or light not in session["initial"] or not old or not new:
+            return
+        # Only a real on/off flip counts; brightness edits and availability changes do not.
+        if {old.state, new.state} != {"on", "off"}:
+            return
+        expected = self.expected.get(light)
+        if expected is None or expected == (new.state == "on"):
+            return  # Not commanded yet in this run, or the result of the routine's own command.
+        self.manual = True  # Halt remaining fade steps immediately.
+        reassert = new.state == "off" and self.commanding == light
+        self.hass.async_create_task(self.manual_toggle(session, light, reassert))
+
+    async def manual_toggle(self, session, light, reassert):
+        """Somebody switched a routine light: end the run and leave the lights alone."""
+        async with self.lock:
+            try:
+                if self.closed or self.session is not session:
+                    return
+                self.session = None
+                self.recovering = False
+                self.last_error = None
+                self.status = "Stopped · light switched manually"
+                await self.save()
+                if reassert:
+                    # A fade step was in flight when the light was switched off; keep it off.
+                    try:
+                        await self.command(light, 0, 0)
+                    except HomeAssistantError as err:
+                        self.last_error = str(err)
+                        await self.save()
+            finally:
+                self.manual = False
+                self.notify()
 
     def brightness(self):
         values = []
@@ -261,6 +299,8 @@ class Controller:
                         "initial": initial if mode == "bed" else {light: 1 for light in initial},
                         "target": round(self.config["wake_brightness"] * 255 / 100) if mode == "wake" else 0, "color": deepcopy(color)}
         self.last_levels = {}
+        self.expected = {}
+        self.manual = False
         self.color_applied = set()
         self.status = "Waking up" if mode == "wake" else "Going to bed"
         try:
@@ -328,15 +368,22 @@ class Controller:
             data["brightness"] = max(1, min(255, value))
             if color:
                 data.update(color_command(state, color))
+        # Recorded before the call so the resulting state change is recognised as the routine's own.
+        self.expected[light] = value > 0
+        self.commanding = light
         try:
             async with asyncio.timeout(COMMAND_TIMEOUT):
                 await self.hass.services.async_call("light", "turn_on" if value > 0 else "turn_off", data, blocking=True)
         except TimeoutError as err:
             raise HomeAssistantError(f"Light command timed out: {light}") from err
+        finally:
+            self.commanding = None
 
     async def apply(self, now, transition=5):
         values = levels(self.session, now)
         for light, value in values.items():
+            if self.manual:
+                return  # A light was switched manually; the run is being stopped.
             if self.last_levels.get(light) != value:
                 await self.command(light, value, 0 if now >= self.session["end"] else transition,
                                    self.session.get("color") if light not in self.color_applied else None)
